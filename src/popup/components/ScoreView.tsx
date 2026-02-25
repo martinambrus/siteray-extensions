@@ -69,7 +69,13 @@ export function ScoreView({ scan, domain, onRescan }: ScoreViewProps) {
         </div>
         <div class="score-info">
           <div class="score-domain">
-            {scan.faviconUrl && <img src={scan.faviconUrl} alt="" />}
+            {scan.faviconUrl && (
+              <img
+                src={scan.faviconUrl}
+                alt=""
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+            )}
             {domain}
           </div>
           {scan.websiteType && (

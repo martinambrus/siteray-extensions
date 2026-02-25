@@ -1,6 +1,10 @@
 import browser from 'webextension-polyfill';
 import type { IconDisplayMode, RiskLevel } from './types';
 
+// Firefox MV2 uses browserAction, Chrome MV3 uses action
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const actionApi = (browser as any).action || (browser as any).browserAction;
+
 const BADGE_COLORS: Record<RiskLevel, [number, number, number]> = {
   green: [34, 197, 94],
   yellow: [234, 179, 8],
@@ -421,9 +425,8 @@ browser.tabs.onRemoved.addListener((tabId) => {
 // Safe wrapper for browser.action calls — silently handles closed tabs
 async function safeSetIcon(imageData: Record<string, ImageData>, tabId: number): Promise<boolean> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await browser.action.setIcon({ imageData: imageData as any, tabId });
-    await browser.action.setBadgeText({ text: '', tabId });
+    await actionApi.setIcon({ imageData: imageData as Record<string, ImageData>, tabId });
+    await actionApi.setBadgeText({ text: '', tabId });
     return true;
   } catch {
     return false;
