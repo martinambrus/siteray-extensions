@@ -6,9 +6,10 @@ interface ScoreViewProps {
   scan: ScanSummary;
   domain: string;
   onRescan: () => Promise<void>;
+  onViewReport: () => void;
 }
 
-export function ScoreView({ scan, domain, onRescan }: ScoreViewProps) {
+export function ScoreView({ scan, domain, onRescan, onViewReport }: ScoreViewProps) {
   const [rescanEligibility, setRescanEligibility] = useState<RescanEligibility | null>(null);
   const [rescanLoading, setRescanLoading] = useState(false);
 
@@ -100,6 +101,14 @@ export function ScoreView({ scan, domain, onRescan }: ScoreViewProps) {
       {showRescanCooldown && (
         <div class="rescan-tooltip">Re-scan available in {formatTimeRemaining(rescanEligibility!.nextAvailableAt!)}</div>
       )}
+      <button class="external-link" onClick={onViewReport}>
+        View full report
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+          <polyline points="15 3 21 3 21 9" />
+          <line x1="10" y1="14" x2="21" y2="3" />
+        </svg>
+      </button>
     </div>
   );
 }

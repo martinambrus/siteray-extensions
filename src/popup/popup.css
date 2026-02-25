@@ -55,7 +55,8 @@ body {
   letter-spacing: -0.01em;
 }
 
-.header-logo svg {
+.header-logo svg,
+.header-logo img {
   width: 20px;
   height: 20px;
 }

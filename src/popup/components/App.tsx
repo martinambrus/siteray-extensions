@@ -279,6 +279,7 @@ export function App() {
           scan={lookupData.scan}
           domain={domain}
           onRescan={handleRescan}
+          onViewReport={() => openWebPage(`/scan/${lookupData.scan!.id}`)}
         />
       )}
       {view === 'not-scanned' && (
