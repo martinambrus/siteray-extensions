@@ -1,0 +1,37 @@
+{
+  "manifest_version": 3,
+  "name": "SiteRay - Website Trust Scores",
+  "version": "1.0.0",
+  "description": "See trust scores for any website at a glance. Powered by SiteRay.",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://siteray.io/*",
+    "http://localhost:3001/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon-gray-16.png",
+      "48": "icons/icon-gray-48.png",
+      "128": "icons/icon-gray-128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon-gray-16.png",
+    "48": "icons/icon-gray-48.png",
+    "128": "icons/icon-gray-128.png"
+  },
+  "content_scripts": [{
+    "matches": ["http://*/*", "https://*/*"],
+    "js": ["content.js"],
+    "run_at": "document_idle"
+  }]
+}
