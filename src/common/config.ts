@@ -1,4 +1,5 @@
-const IS_DEV = true; // Toggle for development vs production
+declare const __IS_DEV__: boolean;
+const IS_DEV = __IS_DEV__;
 
 export const CONFIG = {
   API_BASE_URL: IS_DEV ? 'http://localhost:3001' : 'https://siteray.eu',

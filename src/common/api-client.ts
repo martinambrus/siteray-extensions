@@ -19,7 +19,15 @@ class ApiError extends Error {
   }
 }
 
+let refreshPromise: Promise<boolean> | null = null;
+
 async function refreshTokens(): Promise<boolean> {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = doRefresh().finally(() => { refreshPromise = null; });
+  return refreshPromise;
+}
+
+async function doRefresh(): Promise<boolean> {
   const auth = await getStoredAuth();
   if (!auth?.refreshToken) return false;
 
@@ -28,6 +36,7 @@ async function refreshTokens(): Promise<boolean> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken: auth.refreshToken }),
+      signal: AbortSignal.timeout(15000),
     });
 
     if (!res.ok) {
@@ -44,6 +53,7 @@ async function refreshTokens(): Promise<boolean> {
     await clearAuth();
     return false;
   } catch {
+    await clearAuth();
     return false;
   }
 }
@@ -60,9 +70,9 @@ async function authedFetch(path: string, options: RequestInit = {}): Promise<Res
 
   const headers = new Headers(options.headers);
   headers.set('Authorization', `Bearer ${auth.accessToken}`);
-  headers.set('Content-Type', 'application/json');
+  if (options.body) headers.set('Content-Type', 'application/json');
 
-  let res = await fetch(fullUrl, { ...options, headers });
+  let res = await fetch(fullUrl, { ...options, headers, signal: AbortSignal.timeout(15000) });
   console.log(`[SiteRay] ${method} ${fullUrl} -> ${res.status} ${res.statusText}`);
 
   // On 401, attempt token refresh and retry once
@@ -74,7 +84,7 @@ async function authedFetch(path: string, options: RequestInit = {}): Promise<Res
       const newAuth = await getStoredAuth();
       if (newAuth) {
         headers.set('Authorization', `Bearer ${newAuth.accessToken}`);
-        res = await fetch(fullUrl, { ...options, headers });
+        res = await fetch(fullUrl, { ...options, headers, signal: AbortSignal.timeout(15000) });
         console.log(`[SiteRay] Retry ${method} ${fullUrl} -> ${res.status} ${res.statusText}`);
       }
     } else {
@@ -95,6 +105,7 @@ export async function login(email: string, password: string): Promise<LoginRespo
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
+    signal: AbortSignal.timeout(15000),
   });
 
   if (!res.ok) {
@@ -151,7 +162,7 @@ export async function triggerScan(domain: string): Promise<ScanTriggerResponse> 
 
 export async function checkRescanEligibility(scanId: string): Promise<RescanEligibility> {
   console.log(`[SiteRay] checkRescanEligibility: scanId="${scanId}"`);
-  const res = await authedFetch(`/api/scans/${scanId}/rescan-eligibility`);
+  const res = await authedFetch(`/api/scans/${encodeURIComponent(scanId)}/rescan-eligibility`);
   if (!res.ok) {
     const text = await res.text();
     console.error(`[SiteRay] checkRescanEligibility failed: status=${res.status}, body=${text}`);
@@ -163,7 +174,7 @@ export async function checkRescanEligibility(scanId: string): Promise<RescanElig
 }
 
 export async function getStreamToken(scanId: string): Promise<StreamTokenResponse> {
-  const res = await authedFetch(`/api/scans/${scanId}/stream-token`);
+  const res = await authedFetch(`/api/scans/${encodeURIComponent(scanId)}/stream-token`);
   if (!res.ok) throw new ApiError(res.status, 'Stream token failed');
   return res.json();
 }

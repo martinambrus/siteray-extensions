@@ -14,18 +14,22 @@ export function ScoreView({ scan, domain, onRescan, onViewReport }: ScoreViewPro
   const [rescanLoading, setRescanLoading] = useState(false);
 
   useEffect(() => {
-    checkRescan();
+    let stale = false;
+    (async () => {
+      try {
+        console.log('[SiteRay] ScoreView checkRescan: scanId=', scan.id);
+        const result = await browser.runtime.sendMessage({
+          type: 'CHECK_RESCAN',
+          scanId: scan.id,
+        }) as RescanEligibility;
+        console.log('[SiteRay] ScoreView checkRescan result:', JSON.stringify(result));
+        if (!stale) setRescanEligibility(result);
+      } catch {
+        // Leave rescanEligibility as null
+      }
+    })();
+    return () => { stale = true; };
   }, [scan.id]);
-
-  async function checkRescan() {
-    console.log('[SiteRay] ScoreView checkRescan: scanId=', scan.id);
-    const result = await browser.runtime.sendMessage({
-      type: 'CHECK_RESCAN',
-      scanId: scan.id,
-    }) as RescanEligibility;
-    console.log('[SiteRay] ScoreView checkRescan result:', JSON.stringify(result));
-    setRescanEligibility(result);
-  }
 
   async function handleRescan() {
     setRescanLoading(true);

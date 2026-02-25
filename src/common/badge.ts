@@ -388,19 +388,44 @@ function generateSpinnerFrame(size: number, angle: number): ImageData {
   const cx = size / 2;
   const cy = size / 2;
   const r = size * 0.38;
-  const thickness = Math.max(2, size * 0.14);
+  const halfThick = Math.max(1, size * 0.07);
 
-  // Draw a partial arc (~270 degrees) starting from `angle`
+  // Arc: ~270 degrees starting from `angle`
   const arcLength = Math.PI * 1.5;
-  const steps = Math.ceil(r * arcLength * 2);
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
-    const a = angle + t * arcLength;
-    const px = cx + Math.cos(a) * r;
-    const py = cy + Math.sin(a) * r;
-    // Fade the tail end
-    const alpha = t < 0.15 ? t / 0.15 : 1;
-    drawFilledCircle(data, size, px, py, thickness / 2, PRIMARY_COLOR, Math.round(alpha * 255));
+  const startAngle = angle;
+  const endAngle = angle + arcLength;
+
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const dx = x + 0.5 - cx;
+      const dy = y + 0.5 - cy;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const edgeDist = Math.abs(dist - r);
+
+      // Check if pixel is within the ring thickness
+      if (edgeDist > halfThick) continue;
+
+      // Compute angle of this pixel
+      let pixelAngle = Math.atan2(dy, dx);
+      // Normalize to [startAngle, startAngle + 2*PI)
+      let relative = pixelAngle - startAngle;
+      // Normalize to [0, 2*PI)
+      relative = ((relative % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+
+      // Check if within arc
+      if (relative > arcLength) continue;
+
+      // t: 0 at start (tail), 1 at end (head)
+      const t = relative / arcLength;
+
+      // Fade the tail end
+      const fadeAlpha = t < 0.15 ? t / 0.15 : 1;
+
+      // Anti-alias the ring edge
+      const ringAlpha = edgeDist > halfThick - 1 ? Math.max(0, halfThick - edgeDist) : 1;
+
+      blendPixel(data, size, x, y, PRIMARY_COLOR, fadeAlpha * ringAlpha);
+    }
   }
 
   return new ImageData(data, size, size);
@@ -432,6 +457,13 @@ function stopLoadingAnimation(tabId: number): void {
     clearInterval(existing);
     loadingAnimations.delete(tabId);
   }
+}
+
+export function clearAllAnimations(): void {
+  for (const interval of loadingAnimations.values()) {
+    if (interval) clearInterval(interval);
+  }
+  loadingAnimations.clear();
 }
 
 // Clean up animations when tabs are closed
@@ -473,7 +505,12 @@ export async function setBadgeScore(tabId: number, score: number, riskLevel: Ris
 }
 
 export async function setBadgeLoading(tabId: number): Promise<void> {
-  stopLoadingAnimation(tabId);
+  // If already animating for this tab, don't restart
+  if (loadingAnimations.has(tabId)) return;
+
+  // Reserve the slot synchronously to prevent races
+  loadingAnimations.set(tabId, null as unknown as ReturnType<typeof setInterval>);
+
   ensureSpinnerFrames();
 
   // Clear badge text once upfront
@@ -502,6 +539,42 @@ export async function clearBadge(tabId: number): Promise<void> {
   const imageData: Record<string, ImageData> = {};
   for (const size of [16, 32, 48]) {
     imageData[String(size)] = generateGrayIcon(size);
+  }
+  await safeSetIcon(imageData, tabId);
+}
+
+const RED_COLOR: [number, number, number] = [239, 68, 68];
+
+function generateFailedIcon(size: number): ImageData {
+  // Start with the gray crosshair base
+  const base = generateGrayIcon(size);
+  const data = base.data;
+  const s = size / 24;
+
+  // Overlay a small red filled circle in the bottom-right corner
+  const badgeR = Math.max(3, 4.5 * s);
+  const badgeCx = size - badgeR - 1 * s;
+  const badgeCy = size - badgeR - 1 * s;
+  drawFilledCircle(data, size, badgeCx, badgeCy, badgeR, RED_COLOR, 255);
+
+  // White exclamation mark inside the red circle
+  const white: [number, number, number] = [255, 255, 255];
+  const exStroke = Math.max(1, 1.2 * s);
+  const exTop = badgeCy - badgeR * 0.55;
+  const exBot = badgeCy + badgeR * 0.1;
+  drawLineSegment(data, size, badgeCx, exTop, badgeCx, exBot, exStroke, white, 255);
+  // Dot
+  const dotY = badgeCy + badgeR * 0.5;
+  drawFilledCircle(data, size, badgeCx, dotY, Math.max(0.8, 0.9 * s), white, 255);
+
+  return new ImageData(data, size, size);
+}
+
+export async function setBadgeFailed(tabId: number): Promise<void> {
+  stopLoadingAnimation(tabId);
+  const imageData: Record<string, ImageData> = {};
+  for (const size of [16, 32, 48]) {
+    imageData[String(size)] = generateFailedIcon(size);
   }
   await safeSetIcon(imageData, tabId);
 }

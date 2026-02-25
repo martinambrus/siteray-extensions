@@ -17,6 +17,10 @@ export function ProgressView({ domain, runningScan, onViewScan }: ProgressViewPr
   useEffect(() => {
     if (!runningScan?.scanId) return;
 
+    // Reset state on scanId change
+    setProgress(null);
+    setSseConnected(false);
+
     const abortController = new AbortController();
     abortRef.current = abortController;
 
@@ -44,6 +48,8 @@ export function ProgressView({ domain, runningScan, onViewScan }: ProgressViewPr
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
+        let currentEvent = '';
+        let currentData = '';
 
         while (true) {
           const { done, value } = await reader.read();
@@ -56,10 +62,8 @@ export function ProgressView({ domain, runningScan, onViewScan }: ProgressViewPr
           // Keep the last incomplete line in buffer
           buffer = lines.pop() || '';
 
-          let currentEvent = '';
-          let currentData = '';
-
-          for (const line of lines) {
+          for (const rawLine of lines) {
+            const line = rawLine.replace(/\r$/, '');
             if (line.startsWith('event: ')) {
               currentEvent = line.slice(7).trim();
             } else if (line.startsWith('data: ')) {

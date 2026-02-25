@@ -3,10 +3,12 @@
   "name": "SiteRay - Website Trust Scores",
   "version": "1.0.0",
   "description": "See trust scores for any website at a glance. Powered by SiteRay.",
+  "content_security_policy": "script-src 'self'; object-src 'self'",
   "permissions": [
     "storage",
     "activeTab",
     "tabs",
+    "alarms",
     "https://siteray.eu/*",
     "http://localhost:3001/*",
     "http://10.0.2.2:3001/*"

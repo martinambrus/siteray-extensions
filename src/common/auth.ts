@@ -14,7 +14,7 @@ export async function getStoredAuth(): Promise<StoredAuth | null> {
     STORAGE_KEYS.USER,
   ]);
 
-  if (!result[STORAGE_KEYS.ACCESS_TOKEN] || !result[STORAGE_KEYS.REFRESH_TOKEN]) {
+  if (!result[STORAGE_KEYS.ACCESS_TOKEN] || !result[STORAGE_KEYS.REFRESH_TOKEN] || !result[STORAGE_KEYS.USER]) {
     return null;
   }
 

@@ -1,23 +1,17 @@
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import browser from 'webextension-polyfill';
 import type { StoredAuth, LookupResponse, RunningScan, ExtensionSettings, IconDisplayMode, TrustBarPosition } from '../../common/types';
 import { CONFIG } from '../../common/config';
+import { isLocalDomain } from '../../common/domain-utils';
 import { LoginView } from './LoginView';
 import { ScoreView } from './ScoreView';
 import { NotScannedView } from './NotScannedView';
+import { FailedScanView } from './FailedScanView';
 import { ProgressView } from './ProgressView';
 import { SettingsView } from './SettingsView';
 import { Header } from './Header';
 
-type View = 'loading' | 'login' | 'score' | 'not-scanned' | 'progress';
-
-const SKIP_DOMAINS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '10.0.2.2', '[::1]']);
-
-function isLocalDomain(hostname: string): boolean {
-  if (SKIP_DOMAINS.has(hostname)) return true;
-  if (/^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(hostname)) return true;
-  return false;
-}
+type View = 'loading' | 'login' | 'score' | 'not-scanned' | 'progress' | 'failed';
 
 export function App() {
   const [view, setView] = useState<View>('loading');
@@ -26,44 +20,47 @@ export function App() {
   const [domain, setDomain] = useState<string>('');
   const [runningScan, setRunningScan] = useState<RunningScan | null>(null);
   const [error, setError] = useState<string>('');
+  const [failedScanId, setFailedScanId] = useState<string>('');
   const [showSettings, setShowSettings] = useState(false);
   const [iconDisplayMode, setIconDisplayMode] = useState<IconDisplayMode>('symbols');
   const [trustBarEnabled, setTrustBarEnabled] = useState(true);
   const [trustBarPosition, setTrustBarPosition] = useState<TrustBarPosition>('top');
   const [trustBarSize, setTrustBarSize] = useState(2);
+  const pollingCleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     init();
+    return () => { pollingCleanupRef.current?.(); };
   }, []);
 
   async function init() {
-    // Load settings
-    const settings = await browser.runtime.sendMessage({ type: 'GET_SETTINGS' }) as ExtensionSettings;
-    if (settings?.iconDisplayMode) {
-      setIconDisplayMode(settings.iconDisplayMode);
-    }
-    if (settings?.trustBarEnabled !== undefined) {
-      setTrustBarEnabled(settings.trustBarEnabled);
-      setTrustBarPosition(settings.trustBarPosition);
-      setTrustBarSize(settings.trustBarSize);
-    }
-
-    // Get auth state
-    const storedAuth = await browser.runtime.sendMessage({ type: 'GET_AUTH' }) as StoredAuth | null;
-    if (!storedAuth) {
-      setView('login');
-      return;
-    }
-    setAuth(storedAuth);
-
-    // Get active tab domain
-    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.url) {
-      setView('not-scanned');
-      return;
-    }
-
     try {
+      // Load settings
+      const settings = await browser.runtime.sendMessage({ type: 'GET_SETTINGS' }) as ExtensionSettings;
+      if (settings?.iconDisplayMode) {
+        setIconDisplayMode(settings.iconDisplayMode);
+      }
+      if (settings?.trustBarEnabled !== undefined) {
+        setTrustBarEnabled(settings.trustBarEnabled);
+        setTrustBarPosition(settings.trustBarPosition);
+        setTrustBarSize(settings.trustBarSize);
+      }
+
+      // Get auth state
+      const storedAuth = await browser.runtime.sendMessage({ type: 'GET_AUTH' }) as StoredAuth | null;
+      if (!storedAuth) {
+        setView('login');
+        return;
+      }
+      setAuth(storedAuth);
+
+      // Get active tab domain
+      const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.url) {
+        setView('not-scanned');
+        return;
+      }
+
       const url = new URL(tab.url);
       if (!url.protocol.startsWith('http') || isLocalDomain(url.hostname)) {
         setDomain('');
@@ -102,73 +99,122 @@ export function App() {
       startPolling(domainToLookup, data.runningScan.scanId);
     } else if (data.scan) {
       setView('score');
+    } else if (data.failedScan) {
+      setFailedScanId(data.failedScan.scanId);
+      setView('failed');
     } else {
       setView('not-scanned');
     }
   }
 
   function startPolling(pollingDomain: string, scanId: string) {
+    // Cancel any existing poller
+    pollingCleanupRef.current?.();
+
+    let lastRunningScanStatus: string | undefined;
+    let lastScanId: string | undefined;
+    let inFlight = false;
+    let consecutiveErrors = 0;
+
     const interval = setInterval(async () => {
-      // Invalidate cache so we get fresh data
-      await browser.runtime.sendMessage({
-        type: 'INVALIDATE_CACHE',
-        domain: pollingDomain,
-      });
+      if (inFlight) return;
+      inFlight = true;
 
-      const data = await browser.runtime.sendMessage({
-        type: 'GET_LOOKUP',
-        domain: pollingDomain,
-      }) as LookupResponse;
+      try {
+        // Invalidate cache so we get fresh data
+        await browser.runtime.sendMessage({
+          type: 'INVALIDATE_CACHE',
+          domain: pollingDomain,
+        });
 
-      if (data.success) {
-        setLookupData(data);
-        if (data.scan && !data.runningScan) {
-          // Scan complete
-          clearInterval(interval);
-          setRunningScan(null);
-          setView('score');
-        } else if (data.runningScan) {
-          setRunningScan(data.runningScan);
+        const data = await browser.runtime.sendMessage({
+          type: 'GET_LOOKUP',
+          domain: pollingDomain,
+        }) as LookupResponse;
+
+        consecutiveErrors = 0;
+
+        if (data.success) {
+          if (data.scan && !data.runningScan) {
+            // Scan complete — always update
+            clearInterval(interval);
+            pollingCleanupRef.current = null;
+            setLookupData(data);
+            setRunningScan(null);
+            setView('score');
+          } else if (!data.runningScan && !data.scan && data.failedScan) {
+            // Scan failed — always update
+            clearInterval(interval);
+            pollingCleanupRef.current = null;
+            setLookupData(data);
+            setRunningScan(null);
+            setFailedScanId(data.failedScan.scanId);
+            setView('failed');
+          } else if (data.runningScan) {
+            // Still running — only update state if something changed
+            const newStatus = data.runningScan.status;
+            const newScanId = data.runningScan.scanId;
+            if (newScanId !== lastScanId || newStatus !== lastRunningScanStatus) {
+              lastScanId = newScanId;
+              lastRunningScanStatus = newStatus;
+              setRunningScan(data.runningScan);
+              setLookupData(data);
+            }
+          }
         }
+      } catch {
+        consecutiveErrors++;
+        if (consecutiveErrors >= 3) {
+          clearInterval(interval);
+          pollingCleanupRef.current = null;
+          setError('Connection lost. Please try again.');
+        }
+      } finally {
+        inFlight = false;
       }
     }, 3000);
 
-    // Clean up on unmount (popup close)
-    return () => clearInterval(interval);
+    const cleanup = () => clearInterval(interval);
+    pollingCleanupRef.current = cleanup;
+    return cleanup;
   }
 
   async function handleLogin(email: string, password: string) {
     setError('');
-    const response = await browser.runtime.sendMessage({
-      type: 'LOGIN',
-      email,
-      password,
-    }) as { success: boolean; error?: string; user?: StoredAuth['user']; tokens?: { accessToken: string; refreshToken: string } };
+    try {
+      const response = await browser.runtime.sendMessage({
+        type: 'LOGIN',
+        email,
+        password,
+      }) as { success: boolean; error?: string; user?: StoredAuth['user']; tokens?: { accessToken: string; refreshToken: string } };
 
-    if (response.success) {
-      setAuth({
-        accessToken: response.tokens!.accessToken,
-        refreshToken: response.tokens!.refreshToken,
-        user: response.user!,
-      });
+      if (response.success) {
+        setAuth({
+          accessToken: response.tokens!.accessToken,
+          refreshToken: response.tokens!.refreshToken,
+          user: response.user!,
+        });
 
-      // Fetch lookup for current domain
-      const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-      if (tab?.url) {
-        try {
-          const url = new URL(tab.url);
-          if (url.protocol.startsWith('http')) {
-            setDomain(url.hostname);
-            await fetchLookup(url.hostname);
-            return;
+        // Fetch lookup for current domain
+        const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+        if (tab?.url) {
+          try {
+            const url = new URL(tab.url);
+            if (url.protocol.startsWith('http') && !isLocalDomain(url.hostname)) {
+              setDomain(url.hostname);
+              await fetchLookup(url.hostname);
+              return;
+            }
+          } catch {
+            // ignore
           }
-        } catch {
-          // ignore
         }
+        setView('not-scanned');
+      } else {
+        setError(response.error || 'Login failed');
       }
-      setView('not-scanned');
-    } else {
-      setError(response.error || 'Login failed');
+    } catch {
+      setError('Failed to connect. Please try again.');
     }
   }
 
@@ -223,6 +269,11 @@ export function App() {
     await openWebPage(`/scan/${scanId}`);
   }
 
+  async function handleViewFailedScan() {
+    if (!failedScanId) return;
+    await openWebPage(`/scan/${failedScanId}`);
+  }
+
   async function openWebPage(path: string) {
     const result = await browser.runtime.sendMessage({
       type: 'GET_WEB_LOGIN_URL',
@@ -255,33 +306,22 @@ export function App() {
       type: 'SET_SETTINGS',
       settings: { iconDisplayMode, trustBarEnabled: enabled, trustBarPosition: position, trustBarSize: size },
     });
-    await browser.runtime.sendMessage({ type: 'BAR_SETTINGS_CHANGED' });
   }
 
-  if (view === 'loading') {
-    return (
-      <div>
-        <Header />
-        <div class="content" style={{ alignItems: 'center', padding: '32px 16px' }}>
-          <div class="spinner" />
-        </div>
-      </div>
-    );
-  }
-
-  if (view === 'login') {
-    return (
-      <div>
-        <Header />
-        <LoginView onLogin={handleLogin} error={error} />
-      </div>
-    );
-  }
+  const showFooter = view !== 'loading' && view !== 'login';
 
   return (
     <div>
       <Header />
-      {error && <div class="content"><div class="error">{error}</div></div>}
+      {view === 'loading' && (
+        <div class="content" style={{ alignItems: 'center', padding: '32px 16px' }}>
+          <div class="spinner" />
+        </div>
+      )}
+      {view === 'login' && (
+        <LoginView onLogin={handleLogin} error={error} />
+      )}
+      {showFooter && error && <div class="content"><div class="error">{error}</div></div>}
       {view === 'score' && lookupData?.scan && (
         <ScoreView
           scan={lookupData.scan}
@@ -292,6 +332,9 @@ export function App() {
       )}
       {view === 'not-scanned' && (
         <NotScannedView domain={domain} onScan={handleScan} />
+      )}
+      {view === 'failed' && (
+        <FailedScanView domain={domain} scanId={failedScanId} onScan={handleScan} onViewScan={handleViewFailedScan} />
       )}
       {view === 'progress' && (
         <ProgressView domain={domain} runningScan={runningScan} onViewScan={handleViewScan} />
@@ -307,23 +350,26 @@ export function App() {
           onClose={() => setShowSettings(false)}
         />
       )}
-      <div class="footer">
-        <span class="footer-user">{auth?.user.email}</span>
-        <div class="header-actions">
-          <button
-            class="btn btn-ghost btn-sm"
-            onClick={() => setShowSettings(!showSettings)}
-            title="Icon display settings"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
-            </svg>
-          </button>
-          <button class="btn btn-ghost btn-sm" onClick={handleOpenAccount}>Account</button>
-          <button class="btn btn-ghost btn-sm" onClick={handleLogout}>Logout</button>
+      {showFooter && (
+        <div class="footer">
+          <span class="footer-user">{auth?.user.email}</span>
+          <div class="header-actions">
+            <button
+              class="btn btn-ghost btn-sm"
+              onClick={() => setShowSettings(!showSettings)}
+              title="Icon display settings"
+              aria-label="Settings"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+              </svg>
+            </button>
+            <button class="btn btn-ghost btn-sm" onClick={handleOpenAccount}>Account</button>
+            <button class="btn btn-ghost btn-sm" onClick={handleLogout}>Logout</button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

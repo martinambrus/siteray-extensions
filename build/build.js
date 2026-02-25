@@ -39,7 +39,21 @@ async function build(target) {
 
   // Copy manifest
   const manifestSrc = path.join(ROOT, 'manifests', `${target}.json`);
-  copyFile(manifestSrc, path.join(outdir, 'manifest.json'));
+  const manifestDest = path.join(outdir, 'manifest.json');
+  copyFile(manifestSrc, manifestDest);
+
+  // Strip dev URLs from manifest in production builds
+  if (!watchMode) {
+    const manifest = JSON.parse(fs.readFileSync(manifestDest, 'utf-8'));
+    const devUrls = ['http://localhost:3001/*', 'http://10.0.2.2:3001/*'];
+    if (manifest.host_permissions) {
+      manifest.host_permissions = manifest.host_permissions.filter(u => !devUrls.includes(u));
+    }
+    if (manifest.permissions) {
+      manifest.permissions = manifest.permissions.filter(u => !devUrls.includes(u));
+    }
+    fs.writeFileSync(manifestDest, JSON.stringify(manifest, null, 2));
+  }
 
   // Copy popup HTML and CSS
   copyFile(path.join(SRC, 'popup', 'popup.html'), path.join(outdir, 'popup.html'));
@@ -68,7 +82,9 @@ async function build(target) {
     },
     define: {
       'process.env.NODE_ENV': watchMode ? '"development"' : '"production"',
+      '__IS_DEV__': watchMode ? 'true' : 'false',
     },
+    ...(watchMode ? {} : { pure: ['console.log'] }),
   };
 
   // Build background script

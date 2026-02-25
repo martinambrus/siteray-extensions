@@ -40,10 +40,16 @@ export interface RunningScan {
   createdAt: string;
 }
 
+export interface FailedScan {
+  scanId: string;
+  failedAt: string;
+}
+
 export interface LookupResponse {
   success: boolean;
   scan: ScanSummary | null;
   runningScan: RunningScan | null;
+  failedScan: FailedScan | null;
 }
 
 export interface RescanEligibility {
@@ -53,7 +59,8 @@ export interface RescanEligibility {
 
 export interface ScanTriggerResponse {
   success: boolean;
-  scanId: string;
+  scanId?: string;
+  scan?: { id: string };
 }
 
 export interface StreamTokenResponse {

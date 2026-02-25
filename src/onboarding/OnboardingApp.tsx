@@ -46,7 +46,6 @@ export function OnboardingApp() {
       type: 'SET_SETTINGS',
       settings: { ...current, trustBarEnabled: newEnabled, trustBarPosition: newPosition, trustBarSize: newSize },
     });
-    await browser.runtime.sendMessage({ type: 'BAR_SETTINGS_CHANGED' });
   }
 
   function handleDone() {

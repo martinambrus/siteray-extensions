@@ -12,6 +12,9 @@ let barHost: HTMLElement | null = null;
 let barElement: HTMLElement | null = null;
 
 function createBar(): { host: HTMLElement; bar: HTMLElement } {
+  // Remove any existing bar (prevents duplicates on extension reload)
+  document.getElementById(BAR_ID)?.remove();
+
   const host = document.createElement('div');
   host.id = BAR_ID;
   host.style.cssText = 'all: initial; position: fixed; z-index: 2147483647; pointer-events: none; left: 0; right: 0;';
