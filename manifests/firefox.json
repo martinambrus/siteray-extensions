@@ -8,7 +8,8 @@
     "activeTab",
     "tabs",
     "https://siteray.io/*",
-    "http://localhost:3001/*"
+    "http://localhost:3001/*",
+    "http://10.0.2.2:3001/*"
   ],
   "background": {
     "scripts": ["background.js"],

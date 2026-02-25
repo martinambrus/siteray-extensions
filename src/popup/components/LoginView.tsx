@@ -1,4 +1,5 @@
 import { useState } from 'preact/hooks';
+import browser from 'webextension-polyfill';
 import { CONFIG } from '../../common/config';
 
 interface LoginViewProps {
@@ -61,9 +62,11 @@ export function LoginView({ onLogin, error }: LoginViewProps) {
       <div style={{ textAlign: 'center' }}>
         <a
           class="link"
-          href={`${CONFIG.WEB_BASE_URL}/auth/register`}
-          target="_blank"
-          rel="noopener noreferrer"
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            browser.tabs.create({ url: `${CONFIG.WEB_BASE_URL}/auth/register`, active: true }).then(() => window.close());
+          }}
         >
           Don't have an account? Sign up
         </a>

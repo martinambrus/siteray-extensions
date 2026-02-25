@@ -10,7 +10,8 @@
   ],
   "host_permissions": [
     "https://siteray.io/*",
-    "http://localhost:3001/*"
+    "http://localhost:3001/*",
+    "http://10.0.2.2:3001/*"
   ],
   "background": {
     "service_worker": "background.js",
