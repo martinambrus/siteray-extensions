@@ -11,6 +11,14 @@ import { Header } from './Header';
 
 type View = 'loading' | 'login' | 'score' | 'not-scanned' | 'progress';
 
+const SKIP_DOMAINS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '10.0.2.2', '[::1]']);
+
+function isLocalDomain(hostname: string): boolean {
+  if (SKIP_DOMAINS.has(hostname)) return true;
+  if (/^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(hostname)) return true;
+  return false;
+}
+
 export function App() {
   const [view, setView] = useState<View>('loading');
   const [auth, setAuth] = useState<StoredAuth | null>(null);
@@ -57,8 +65,8 @@ export function App() {
 
     try {
       const url = new URL(tab.url);
-      if (!url.protocol.startsWith('http')) {
-        setDomain(url.hostname || 'N/A');
+      if (!url.protocol.startsWith('http') || isLocalDomain(url.hostname)) {
+        setDomain('');
         setView('not-scanned');
         return;
       }
