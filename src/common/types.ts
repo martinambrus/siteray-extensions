@@ -58,7 +58,7 @@ export interface ScanTriggerResponse {
 
 export interface StreamTokenResponse {
   success: boolean;
-  token: string;
+  streamToken: string;
 }
 
 export type RiskLevel = 'green' | 'yellow' | 'red';
@@ -79,6 +79,32 @@ export interface TrustBarData {
   riskLevel: RiskLevel;
   position: TrustBarPosition;
   size: number;
+}
+
+export interface ScanProgressStep {
+  code: string;
+  name: string;
+  order: number;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
+  resultSummary: string | null;
+  durationMs: number | null;
+  estimatedDurationMs: number | null;
+}
+
+export interface ScanProgressData {
+  scanId: string;
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'timeout';
+  steps: ScanProgressStep[];
+  eta: {
+    remainingMs: number;
+    completedSteps: number;
+    totalSteps: number;
+    displayText: string;
+  };
+  step?: string;
+  substep?: { text: string; startedAt: string };
+  substepProgress?: { current: number; total: number };
+  queuePosition?: { ahead: number; total: number } | null;
 }
 
 export type ContentMessage = { type: 'UPDATE_BAR'; data: TrustBarData | null };
