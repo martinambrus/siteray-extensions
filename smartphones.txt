@@ -1,0 +1,75 @@
+  Brave on Android
+
+  Yes, Brave for Android does support Chrome extensions (it's one of the few mobile browsers
+  that does). Since your extension uses MV3, it should work. Users can enable it via Brave's
+  settings. However, the experience may vary - popup UI works differently on mobile, and
+  content scripts may have quirks. Worth testing but not a guaranteed smooth experience.
+
+  Native App with URL Selection Overlay
+
+  Yes, this is absolutely feasible, and you're right that Google Translate uses exactly this
+  pattern. Here's how it works on each platform:
+
+  Android
+
+  Two complementary mechanisms:
+
+  1. PROCESS_TEXT Intent - This is how Google Translate appears in the text selection toolbar.
+   You register an intent filter for android.intent.action.PROCESS_TEXT, and when a user
+  selects text (including URLs) in any app, your app appears as an option in the floating
+  toolbar. Your app receives the selected text, checks if it's a URL, and acts on it.
+  2. Overlay / Floating Window (SYSTEM_ALERT_WINDOW permission) - This is how you'd show the
+  scan result as an overlay on top of the current app (like Messenger chat heads). Once the
+  user taps your action in the selection menu, you display a floating view with the scan
+  progress and result.
+
+  So the flow would be: User selects URL -> taps "SiteRay" in selection menu -> floating
+  overlay shows scan progress/result - all without leaving the current app.
+
+  iOS
+
+  iOS is more restrictive. There's no equivalent to PROCESS_TEXT. Your options:
+
+  1. Share Extension - Appears in the system share sheet. User selects a URL, taps Share, taps
+   SiteRay, and sees the result in a sheet. This is the most practical approach.
+  2. Action Extension - Similar to share extension but can modify content in-place. Less
+  relevant here.
+  3. Safari Web Extension - iOS does support Safari extensions, so your existing web extension
+   could be adapted for Safari on iOS. This would give the most seamless browser experience.
+
+  iOS does not allow floating overlays on top of other apps - Apple prohibits this.
+
+  Recommendation
+
+  For the best user experience matching what you described:
+
+  ┌─────────────────────┬─────────────────────────────────────┬──────────────────────────┐
+  │       Feature       │               Android               │           iOS            │
+  ├─────────────────────┼─────────────────────────────────────┼──────────────────────────┤
+  │ URL selection       │ PROCESS_TEXT intent                 │ Share Extension          │
+  │ detection           │                                     │                          │
+  ├─────────────────────┼─────────────────────────────────────┼──────────────────────────┤
+  │ Overlay display     │ SYSTEM_ALERT_WINDOW                 │ In-app sheet (no true    │
+  │                     │                                     │ overlay)                 │
+  ├─────────────────────┼─────────────────────────────────────┼──────────────────────────┤
+  │ Browser integration │ Also possible via extension on      │ Safari Web Extension     │
+  │                     │ Brave/Kiwi                          │                          │
+  └─────────────────────┴─────────────────────────────────────┴──────────────────────────┘
+
+  Tech Stack Options
+
+  For building both apps, you could use:
+  - React Native or Expo - You already know React/Preact, so this is a natural fit. However,
+  the native intent handling and overlay views require native modules.
+  - Kotlin (Android) / Swift (iOS) - Separate native apps give you full control over the
+  platform-specific features (PROCESS_TEXT, overlays, share extensions).
+  - Flutter - Good cross-platform option with better native integration for overlays via
+  platform channels.
+
+  Given that the key features (text selection handling, overlays) are deeply
+  platform-specific, you might get the best results with native apps or a cross-platform
+  framework with native modules. The API calls to your SiteRay backend would be
+  straightforward in any approach.
+
+  Would you like to start building one of these? If so, which platform first, and do you have
+  a preference on the tech stack?
