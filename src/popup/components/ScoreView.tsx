@@ -83,9 +83,6 @@ export function ScoreView({ scan, domain, onRescan, onViewReport }: ScoreViewPro
             )}
             {domain}
           </div>
-          {scan.websiteType && (
-            <div class="score-type">{scan.websiteType}</div>
-          )}
         </div>
       </div>
 
