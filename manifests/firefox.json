@@ -7,7 +7,7 @@
     "storage",
     "activeTab",
     "tabs",
-    "https://siteray.io/*",
+    "https://siteray.eu/*",
     "http://localhost:3001/*",
     "http://10.0.2.2:3001/*"
   ],
@@ -35,7 +35,7 @@
   }],
   "browser_specific_settings": {
     "gecko": {
-      "id": "extension@siteray.io",
+      "id": "extension@siteray.eu",
       "strict_min_version": "109.0"
     }
   }
