@@ -406,6 +406,23 @@ function generateSpinnerFrame(size: number, angle: number): ImageData {
   return new ImageData(data, size, size);
 }
 
+// Pre-generated spinner frames for smooth animation
+const SPINNER_TOTAL_FRAMES = 30;
+const SPINNER_INTERVAL_MS = 33; // ~30 FPS
+const preRenderedSpinnerFrames: Array<Record<string, ImageData>> = [];
+
+function ensureSpinnerFrames(): void {
+  if (preRenderedSpinnerFrames.length > 0) return;
+  for (let f = 0; f < SPINNER_TOTAL_FRAMES; f++) {
+    const angle = (f / SPINNER_TOTAL_FRAMES) * Math.PI * 2 - Math.PI / 2;
+    const imageData: Record<string, ImageData> = {};
+    for (const size of [16, 32, 48]) {
+      imageData[String(size)] = generateSpinnerFrame(size, angle);
+    }
+    preRenderedSpinnerFrames.push(imageData);
+  }
+}
+
 // Track animation intervals per tab so we can stop them
 const loadingAnimations = new Map<number, ReturnType<typeof setInterval>>();
 
@@ -433,6 +450,16 @@ async function safeSetIcon(imageData: Record<string, ImageData>, tabId: number):
   }
 }
 
+// Lightweight icon-only update for animation frames (skips redundant setBadgeText)
+async function safeSetIconOnly(imageData: Record<string, ImageData>, tabId: number): Promise<boolean> {
+  try {
+    await actionApi.setIcon({ imageData: imageData as Record<string, ImageData>, tabId });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function setBadgeScore(tabId: number, score: number, riskLevel: RiskLevel, mode: IconDisplayMode = 'numbers'): Promise<void> {
   stopLoadingAnimation(tabId);
   const color = BADGE_COLORS[riskLevel];
@@ -447,27 +474,26 @@ export async function setBadgeScore(tabId: number, score: number, riskLevel: Ris
 
 export async function setBadgeLoading(tabId: number): Promise<void> {
   stopLoadingAnimation(tabId);
+  ensureSpinnerFrames();
+
+  // Clear badge text once upfront
+  try { await actionApi.setBadgeText({ text: '', tabId }); } catch { /* tab closed */ }
 
   let frame = 0;
-  const totalFrames = 12;
 
   async function renderFrame() {
-    const angle = (frame / totalFrames) * Math.PI * 2 - Math.PI / 2;
-    const imageData: Record<string, ImageData> = {};
-    for (const size of [16, 32, 48]) {
-      imageData[String(size)] = generateSpinnerFrame(size, angle);
-    }
-    const ok = await safeSetIcon(imageData, tabId);
+    const imageData = preRenderedSpinnerFrames[frame];
+    const ok = await safeSetIconOnly(imageData, tabId);
     if (!ok) {
       stopLoadingAnimation(tabId);
       return;
     }
-    frame = (frame + 1) % totalFrames;
+    frame = (frame + 1) % SPINNER_TOTAL_FRAMES;
   }
 
   // Show first frame immediately, then animate
   await renderFrame();
-  const interval = setInterval(renderFrame, 120);
+  const interval = setInterval(renderFrame, SPINNER_INTERVAL_MS);
   loadingAnimations.set(tabId, interval);
 }
 
