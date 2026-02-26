@@ -89,14 +89,24 @@ async function applyBadge(tabId: number, data: LookupResponse, domain?: string):
 // Track tabs already being processed for OAuth to prevent double-handling
 const oauthProcessingTabs = new Set<number>();
 
+function isExtOAuthCompleteUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.pathname === '/auth/ext-oauth-complete';
+  } catch {
+    return false;
+  }
+}
+
 // Listen for tab URL changes
 browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   // Detect ext-oauth-complete on both full page load (status=complete) and SPA navigation (url change)
   const currentUrl = changeInfo.url || tab.url || '';
   if (
     (changeInfo.url || changeInfo.status === 'complete') &&
-    currentUrl.startsWith(`${CONFIG.WEB_BASE_URL}/auth/ext-oauth-complete`)
+    isExtOAuthCompleteUrl(currentUrl)
   ) {
+    console.log(`[SiteRay] Detected ext-oauth-complete URL: ${currentUrl} (tab ${tabId}, changeInfo: ${JSON.stringify(changeInfo)})`);
     if (oauthProcessingTabs.has(tabId)) return;
     oauthProcessingTabs.add(tabId);
     try {
@@ -461,24 +471,29 @@ async function handleOAuthComplete(tabId: number, url: string) {
     const error = parsed.searchParams.get('error');
 
     if (error) {
-      // Error case — just close the tab silently
+      console.log(`[SiteRay] OAuth complete: error=${error}`);
       try { await browser.tabs.remove(tabId); } catch { /* tab may already be closed */ }
       return;
     }
 
     const token = parsed.searchParams.get('token');
     if (!token) {
+      console.log('[SiteRay] OAuth complete: no token in URL');
       try { await browser.tabs.remove(tabId); } catch { /* tab may already be closed */ }
       return;
     }
 
+    console.log(`[SiteRay] OAuth complete: exchanging handoff token (${token.slice(0, 8)}...)`);
     const response = await exchangeOAuthToken(token);
+    console.log(`[SiteRay] OAuth complete: exchange response success=${response.success}, user=${response.user?.email}`);
+
     if (response.success) {
       await storeAuth({
         accessToken: response.tokens.accessToken,
         refreshToken: response.tokens.refreshToken,
         user: response.user,
       });
+      console.log('[SiteRay] OAuth complete: auth stored, restoring badges');
       await restoreBadges();
     }
 
