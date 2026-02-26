@@ -1,17 +1,15 @@
 {
   "manifest_version": 2,
-  "name": "SiteRay - Website Trust Scores",
+  "name": "SiteRay - Website Reputation",
   "version": "1.0.0",
-  "description": "See trust scores for any website at a glance. Powered by SiteRay.",
+  "description": "View SiteRay reputation data for websites you visit.",
   "content_security_policy": "script-src 'self'; object-src 'self'",
   "permissions": [
     "storage",
     "activeTab",
     "tabs",
     "alarms",
-    "https://api.siteray.eu/*",
-    "http://localhost:3001/*",
-    "http://10.0.2.2:3001/*"
+    "https://api.siteray.eu/*"
   ],
   "background": {
     "scripts": ["background.js"],
@@ -38,9 +36,9 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "siteray-extension@siteray.eu",
-      "strict_min_version": "109.0",
+      "strict_min_version": "140.0",
       "data_collection_permissions": {
-        "required": ["browsingActivity", "authenticationInfo"],
+        "required": ["browsingActivity"],
         "optional": []
       }
     }

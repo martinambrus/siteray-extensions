@@ -31,7 +31,7 @@ export function SettingsView({
           onClick={() => onChangeMode('numbers')}
         >
           <span class="settings-option-label">Numbers</span>
-          <span class="settings-option-desc">Show trust score (0-100)</span>
+          <span class="settings-option-desc">Show score (0-100)</span>
         </button>
         <button
           class={`settings-option ${iconDisplayMode === 'symbols' ? 'active' : ''}`}
@@ -43,7 +43,7 @@ export function SettingsView({
       </div>
 
       <div class="settings-header" style={{ marginTop: '12px' }}>
-        <span class="settings-title">Trust Bar</span>
+        <span class="settings-title">Site Bar</span>
       </div>
       <div class="settings-options">
         <button
@@ -58,7 +58,7 @@ export function SettingsView({
           onClick={() => onChangeTrustBar(false, trustBarPosition, trustBarSize)}
         >
           <span class="settings-option-label">Off</span>
-          <span class="settings-option-desc">Hide trust bar</span>
+          <span class="settings-option-desc">Hide site bar</span>
         </button>
       </div>
 

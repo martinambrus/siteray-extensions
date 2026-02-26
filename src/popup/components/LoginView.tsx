@@ -74,7 +74,7 @@ export function LoginView({ onLogin, error }: LoginViewProps) {
   return (
     <div class="content">
       <div class="login-title">Sign in to SiteRay</div>
-      <div class="login-subtitle">Enter your credentials to see trust scores</div>
+      <div class="login-subtitle">Sign in to view reputation data</div>
       {error && <div class="error">{error}</div>}
       <form class="login-form" onSubmit={handleSubmit}>
         <div class="form-group">

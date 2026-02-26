@@ -72,7 +72,7 @@ export function OnboardingApp() {
       <div class="onboarding-header">
         <div class="onboarding-title">Welcome to SiteRay</div>
         <div class="onboarding-subtitle">
-          SiteRay shows a colored trust bar on every website you visit so you can see at a glance if a site is safe.
+          SiteRay shows a colored bar on websites you visit, indicating their reputation score from the SiteRay database.
         </div>
       </div>
 
@@ -86,7 +86,7 @@ export function OnboardingApp() {
           </div>
         </div>
         <div class="section-desc">
-          Green = trusted, Yellow = caution, Red = risky. The bar updates automatically as you browse.
+          Green = low risk, Yellow = medium risk, Red = high risk. The bar updates automatically as you browse.
         </div>
       </div>
 

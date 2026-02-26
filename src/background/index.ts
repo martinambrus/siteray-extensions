@@ -217,7 +217,7 @@ async function handleLogin(email: string, password: string) {
         user: response.user,
       });
 
-      // Trigger lookup for the active tab and push trust bar
+      // Trigger lookup for the active tab and push bar data
       const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
       if (tab?.id && tab.url) {
         const domain = extractDomain(tab.url);
@@ -274,7 +274,7 @@ async function handleLookup(domain: string) {
     const data = await lookup(domain);
     cacheLookup(domain, data);
 
-    // Update badge and trust bar for active tab
+    // Update badge and bar for active tab
     const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
     if (tab?.id) {
       applyBadge(tab.id, data, domain);
