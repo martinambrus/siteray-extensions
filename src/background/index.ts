@@ -166,11 +166,15 @@ browser.runtime.onMessage.addListener(
         }
         return handleLookup(msg.domain);
       case 'TRIGGER_SCAN':
-      case 'TRIGGER_RESCAN':
         if (typeof msg.domain !== 'string') {
           return Promise.resolve({ success: false, error: 'Invalid message' });
         }
         return handleTriggerScan(msg.domain);
+      case 'TRIGGER_RESCAN':
+        if (typeof msg.domain !== 'string') {
+          return Promise.resolve({ success: false, error: 'Invalid message' });
+        }
+        return handleTriggerScan(msg.domain, { forceRefresh: true });
       case 'CHECK_RESCAN':
         if (typeof msg.scanId !== 'string') {
           return Promise.resolve({ success: false, error: 'Invalid message' });
@@ -428,11 +432,11 @@ browser.alarms.onAlarm.addListener((alarm) => {
   }
 });
 
-async function handleTriggerScan(domain: string) {
+async function handleTriggerScan(domain: string, options?: { forceRefresh?: boolean }) {
   if (isLocalDomain(domain)) return { success: false, error: 'Local domain' };
-  console.log(`[SiteRay] handleTriggerScan: domain="${domain}"`);
+  console.log(`[SiteRay] handleTriggerScan: domain="${domain}", forceRefresh=${options?.forceRefresh ?? false}`);
   try {
-    const result = await triggerScan(domain);
+    const result = await triggerScan(domain, options);
     console.log('[SiteRay] handleTriggerScan result:', JSON.stringify(result));
     // Invalidate cache for this domain so next lookup fetches fresh data
     lookupCache.delete(domain);

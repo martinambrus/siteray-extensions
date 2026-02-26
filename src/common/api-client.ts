@@ -138,12 +138,12 @@ export async function lookup(domain: string): Promise<LookupResponse> {
   return data;
 }
 
-export async function triggerScan(domain: string): Promise<ScanTriggerResponse> {
+export async function triggerScan(domain: string, options?: { forceRefresh?: boolean }): Promise<ScanTriggerResponse> {
   const url = domain.includes('://') ? domain : `https://${domain}`;
-  console.log(`[SiteRay] triggerScan called with domain="${domain}", resolved url="${url}"`);
+  console.log(`[SiteRay] triggerScan called with domain="${domain}", resolved url="${url}", forceRefresh=${options?.forceRefresh ?? false}`);
   const res = await authedFetch('/api/scans', {
     method: 'POST',
-    body: JSON.stringify({ url }),
+    body: JSON.stringify({ url, forceRefresh: options?.forceRefresh ?? false }),
   });
   if (!res.ok) {
     const text = await res.text();
