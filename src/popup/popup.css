@@ -559,6 +559,66 @@ body {
   margin-top: 2px;
 }
 
+/* OAuth section */
+.oauth-section {
+  margin-top: 2px;
+}
+
+.oauth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.oauth-divider-line {
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.oauth-divider-text {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.oauth-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.oauth-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-input);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  min-height: 36px;
+}
+
+.oauth-btn:hover {
+  background: var(--border);
+  border-color: var(--text-muted);
+}
+
+.oauth-btn svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
 /* Mobile-friendly touch targets */
 @media (pointer: coarse) {
   .btn {

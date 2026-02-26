@@ -30,7 +30,19 @@ export function App() {
 
   useEffect(() => {
     init();
-    return () => { pollingCleanupRef.current?.(); };
+
+    // Listen for auth changes from background (e.g., OAuth completed in another tab)
+    const onStorageChanged = (changes: Record<string, browser.Storage.StorageChange>) => {
+      if (changes.accessToken?.newValue && !auth) {
+        init();
+      }
+    };
+    browser.storage.onChanged.addListener(onStorageChanged);
+
+    return () => {
+      pollingCleanupRef.current?.();
+      browser.storage.onChanged.removeListener(onStorageChanged);
+    };
   }, []);
 
   async function init() {

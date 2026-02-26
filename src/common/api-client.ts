@@ -7,6 +7,8 @@ import type {
   ScanTriggerResponse,
   RescanEligibility,
   StreamTokenResponse,
+  OAuthProvidersResponse,
+  OAuthExchangeResponse,
 } from './types';
 
 class ApiError extends Error {
@@ -182,5 +184,34 @@ export async function getStreamToken(scanId: string): Promise<StreamTokenRespons
 export async function getWebLoginUrl(): Promise<{ success: boolean; url: string }> {
   const res = await authedFetch('/api/ext/web-login-token');
   if (!res.ok) throw new ApiError(res.status, 'Failed to get login token');
+  return res.json();
+}
+
+export async function getOAuthProviders(): Promise<OAuthProvidersResponse> {
+  const res = await fetch(`${CONFIG.API_BASE_URL}/api/auth/oauth/providers`, {
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) throw new ApiError(res.status, 'Failed to get OAuth providers');
+  return res.json();
+}
+
+export async function exchangeOAuthToken(token: string): Promise<OAuthExchangeResponse> {
+  const res = await fetch(`${CONFIG.API_BASE_URL}/api/ext/oauth-exchange`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token }),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    let message = 'OAuth exchange failed';
+    try {
+      const json = JSON.parse(text);
+      message = json.error || json.message || message;
+    } catch {
+      // use default
+    }
+    throw new ApiError(res.status, message);
+  }
   return res.json();
 }

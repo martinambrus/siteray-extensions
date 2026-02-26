@@ -114,6 +114,19 @@ export interface ScanProgressData {
   queuePosition?: { ahead: number; total: number } | null;
 }
 
+export type OAuthProvider = 'google' | 'github' | 'apple';
+
+export interface OAuthProvidersResponse {
+  success: boolean;
+  providers: OAuthProvider[];
+}
+
+export interface OAuthExchangeResponse {
+  success: boolean;
+  user: User;
+  tokens: Tokens;
+}
+
 export type ContentMessage = { type: 'UPDATE_BAR'; data: TrustBarData | null };
 
 export interface StoredAuth {
@@ -142,4 +155,6 @@ export type BackgroundMessage =
   | { type: 'GET_SETTINGS' }
   | { type: 'SET_SETTINGS'; settings: ExtensionSettings }
   | { type: 'GET_BAR_DATA'; domain: string }
-  | { type: 'BAR_SETTINGS_CHANGED' };
+  | { type: 'BAR_SETTINGS_CHANGED' }
+  | { type: 'GET_OAUTH_PROVIDERS' }
+  | { type: 'START_OAUTH'; provider: OAuthProvider };

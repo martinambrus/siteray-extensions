@@ -1,11 +1,11 @@
 import browser from 'webextension-polyfill';
 import { getStoredAuth, storeAuth, clearAuth } from '../common/auth';
-import { login, lookup, triggerScan, checkRescanEligibility, getStreamToken, getWebLoginUrl } from '../common/api-client';
+import { login, lookup, triggerScan, checkRescanEligibility, getStreamToken, getWebLoginUrl, getOAuthProviders, exchangeOAuthToken } from '../common/api-client';
 import { setBadgeScore, setBadgeLoading, clearBadge, setBadgeFailed, clearAllAnimations } from '../common/badge';
 import { getSettings, saveSettings } from '../common/settings';
 import { CONFIG } from '../common/config';
 import { isLocalDomain } from '../common/domain-utils';
-import type { BackgroundMessage, CacheEntry, ExtensionSettings, LookupResponse, TrustBarData } from '../common/types';
+import type { BackgroundMessage, CacheEntry, ExtensionSettings, LookupResponse, TrustBarData, OAuthProvider } from '../common/types';
 
 // In-memory lookup cache
 const lookupCache = new Map<string, CacheEntry>();
@@ -90,6 +90,12 @@ async function applyBadge(tabId: number, data: LookupResponse, domain?: string):
 browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (changeInfo.status !== 'complete' || !tab.url) return;
 
+  // Check for ext-oauth-complete URL (OAuth handoff from browser tab)
+  if (tab.url.startsWith(`${CONFIG.WEB_BASE_URL}/auth/ext-oauth-complete`)) {
+    await handleOAuthComplete(tabId, tab.url);
+    return;
+  }
+
   const domain = extractDomain(tab.url);
   if (!domain) {
     await clearBadge(tabId);
@@ -165,6 +171,13 @@ browser.runtime.onMessage.addListener(
         return handleGetBarData(msg.domain);
       case 'BAR_SETTINGS_CHANGED':
         return handleBarSettingsChanged();
+      case 'GET_OAUTH_PROVIDERS':
+        return handleGetOAuthProviders();
+      case 'START_OAUTH':
+        if (typeof (msg as { provider?: string }).provider !== 'string') {
+          return Promise.resolve({ success: false, error: 'Invalid message' });
+        }
+        return handleStartOAuth((msg as { provider: OAuthProvider }).provider);
       default:
         return undefined;
     }
@@ -427,6 +440,58 @@ async function handleGetWebLoginUrl(redirect: string) {
     console.error('[SiteRay] handleGetWebLoginUrl error:', err);
     return { success: false, error: (err as Error).message };
   }
+}
+
+async function handleOAuthComplete(tabId: number, url: string) {
+  try {
+    const parsed = new URL(url);
+    const error = parsed.searchParams.get('error');
+
+    if (error) {
+      // Error case — just close the tab silently
+      try { await browser.tabs.remove(tabId); } catch { /* tab may already be closed */ }
+      return;
+    }
+
+    const token = parsed.searchParams.get('token');
+    if (!token) {
+      try { await browser.tabs.remove(tabId); } catch { /* tab may already be closed */ }
+      return;
+    }
+
+    const response = await exchangeOAuthToken(token);
+    if (response.success) {
+      await storeAuth({
+        accessToken: response.tokens.accessToken,
+        refreshToken: response.tokens.refreshToken,
+        user: response.user,
+      });
+      await restoreBadges();
+    }
+
+    // Close the tab after a short delay so the user sees the success page briefly
+    setTimeout(async () => {
+      try { await browser.tabs.remove(tabId); } catch { /* tab may already be closed */ }
+    }, 1500);
+  } catch (err) {
+    console.error('[SiteRay] OAuth complete handler error:', err);
+    try { await browser.tabs.remove(tabId); } catch { /* tab may already be closed */ }
+  }
+}
+
+async function handleGetOAuthProviders() {
+  try {
+    const response = await getOAuthProviders();
+    return { success: true, providers: response.providers || [] };
+  } catch {
+    return { success: true, providers: [] };
+  }
+}
+
+async function handleStartOAuth(provider: OAuthProvider) {
+  const url = `${CONFIG.API_BASE_URL}/api/auth/oauth/${provider}/start?source=extension`;
+  await browser.tabs.create({ url, active: true });
+  return { success: true };
 }
 
 function buildBarData(data: LookupResponse, settings: ExtensionSettings): TrustBarData | null {
