@@ -86,15 +86,28 @@ async function applyBadge(tabId: number, data: LookupResponse, domain?: string):
   }
 }
 
+// Track tabs already being processed for OAuth to prevent double-handling
+const oauthProcessingTabs = new Set<number>();
+
 // Listen for tab URL changes
 browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  if (changeInfo.status !== 'complete' || !tab.url) return;
-
-  // Check for ext-oauth-complete URL (OAuth handoff from browser tab)
-  if (tab.url.startsWith(`${CONFIG.WEB_BASE_URL}/auth/ext-oauth-complete`)) {
-    await handleOAuthComplete(tabId, tab.url);
+  // Detect ext-oauth-complete on both full page load (status=complete) and SPA navigation (url change)
+  const currentUrl = changeInfo.url || tab.url || '';
+  if (
+    (changeInfo.url || changeInfo.status === 'complete') &&
+    currentUrl.startsWith(`${CONFIG.WEB_BASE_URL}/auth/ext-oauth-complete`)
+  ) {
+    if (oauthProcessingTabs.has(tabId)) return;
+    oauthProcessingTabs.add(tabId);
+    try {
+      await handleOAuthComplete(tabId, currentUrl);
+    } finally {
+      oauthProcessingTabs.delete(tabId);
+    }
     return;
   }
+
+  if (changeInfo.status !== 'complete' || !tab.url) return;
 
   const domain = extractDomain(tab.url);
   if (!domain) {
