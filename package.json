@@ -1,7 +1,7 @@
 {
   "name": "siteray-extension",
   "version": "1.0.0",
-  "description": "SiteRay browser extension - website reputation data",
+  "description": "SiteRay browser extension - website trust scores at a glance",
   "private": true,
   "scripts": {
     "build": "node build/build.js",

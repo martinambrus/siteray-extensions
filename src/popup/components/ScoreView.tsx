@@ -68,7 +68,7 @@ export function ScoreView({ scan, domain, onRescan, onViewReport }: ScoreViewPro
           </div>
           {scan.riskLevel && (
             <div class={`risk-label ${scan.riskLevel}`}>
-              {scan.riskLevel === 'green' ? 'Low Risk' : scan.riskLevel === 'yellow' ? 'Medium Risk' : 'High Risk'}
+              {scan.riskLevel === 'green' ? 'Trusted' : scan.riskLevel === 'yellow' ? 'Use Caution' : 'High Risk'}
             </div>
           )}
         </div>
