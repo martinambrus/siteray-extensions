@@ -80,7 +80,21 @@ export function App() {
         return;
       }
       setDomain(url.hostname);
+
+      // Check if CTRL/Cmd was held when clicking the icon (via content script)
+      let ctrlHeld = false;
+      if (tab.id) {
+        try {
+          const modState = await browser.tabs.sendMessage(tab.id, { type: 'GET_MODIFIER_STATE' }) as { ctrlKey: boolean } | undefined;
+          ctrlHeld = !!modState?.ctrlKey;
+        } catch { /* content script not loaded */ }
+      }
+
       await fetchLookup(url.hostname);
+
+      if (ctrlHeld) {
+        await performQuickScan(url.hostname);
+      }
     } catch {
       setView('not-scanned');
     }
@@ -116,6 +130,22 @@ export function App() {
       setView('failed');
     } else {
       setView('not-scanned');
+    }
+  }
+
+  async function performQuickScan(targetDomain: string) {
+    const result = await browser.runtime.sendMessage({
+      type: 'QUICK_SCAN',
+      domain: targetDomain,
+    }) as { success: boolean; action?: string; scanId?: string; scan?: { id: string }; error?: string };
+
+    if (result.success) {
+      const scanId = result.scan?.id || result.scanId;
+      if (scanId && result.action !== 'already-running') {
+        setRunningScan({ scanId, status: 'queued', createdAt: new Date().toISOString() });
+        setView('progress');
+        startPolling(targetDomain, scanId);
+      }
     }
   }
 

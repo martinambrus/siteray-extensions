@@ -157,4 +157,5 @@ export type BackgroundMessage =
   | { type: 'GET_BAR_DATA'; domain: string }
   | { type: 'BAR_SETTINGS_CHANGED' }
   | { type: 'GET_OAUTH_PROVIDERS' }
-  | { type: 'START_OAUTH'; provider: OAuthProvider };
+  | { type: 'START_OAUTH'; provider: OAuthProvider }
+  | { type: 'QUICK_SCAN'; domain: string };

@@ -205,6 +205,11 @@ browser.runtime.onMessage.addListener(
           return Promise.resolve({ success: false, error: 'Invalid message' });
         }
         return handleStartOAuth((msg as { provider: OAuthProvider }).provider);
+      case 'QUICK_SCAN':
+        if (typeof msg.domain !== 'string') {
+          return Promise.resolve({ success: false, error: 'Invalid message' });
+        }
+        return handleQuickScan(msg.domain);
       default:
         return undefined;
     }
@@ -445,6 +450,36 @@ async function handleTriggerScan(domain: string, options?: { forceRefresh?: bool
     return result;
   } catch (err) {
     console.error('[SiteRay] handleTriggerScan error:', err);
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+async function handleQuickScan(domain: string) {
+  if (isLocalDomain(domain)) return { success: false, error: 'Local domain' };
+  try {
+    // Get current state from cache or API
+    let data = getCachedLookup(domain);
+    if (!data) {
+      data = await lookup(domain);
+      cacheLookup(domain, data);
+    }
+
+    if (data.runningScan) {
+      return { success: true, action: 'already-running', scanId: data.runningScan.scanId };
+    }
+
+    if (data.scan) {
+      // Existing scan — try rescan
+      const eligibility = await checkRescanEligibility(data.scan.id);
+      if (eligibility.eligible) {
+        return await handleTriggerScan(domain, { forceRefresh: true });
+      }
+      return { success: false, action: 'rescan-not-eligible' };
+    }
+
+    // No scan — trigger new one
+    return await handleTriggerScan(domain);
+  } catch (err) {
     return { success: false, error: (err as Error).message };
   }
 }

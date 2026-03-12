@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "SiteRay - Website Trust Scores",
-  "version": "1.1.0",
+  "version": "1.2.1",
   "description": "See trust scores for any website at a glance. Powered by SiteRay.",
   "content_security_policy": "script-src 'self'; object-src 'self'",
   "permissions": [
@@ -35,7 +35,7 @@
   }],
   "browser_specific_settings": {
     "gecko": {
-      "id": "siteray-extension@siteray.eu",
+      "id": "siteray-trust-scores@siteray.eu",
       "strict_min_version": "140.0",
       "data_collection_permissions": {
         "required": ["browsingActivity"],

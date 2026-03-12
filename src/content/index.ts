@@ -1,6 +1,9 @@
 import browser from 'webextension-polyfill';
 import type { ContentMessage, TrustBarData } from '../common/types';
 
+// Signal to the website that the extension is installed
+document.documentElement.dataset.siterayExt = '1';
+
 const BAR_ID = 'siteray-trust-bar';
 const COLORS: Record<string, string> = {
   green: '#22c55e',
@@ -62,11 +65,23 @@ function removeBar(): void {
   barElement = null;
 }
 
-// Listen for messages from background
+// Track modifier key state for CTRL+click detection by the popup
+let ctrlPressedAt = 0;
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Control' || e.key === 'Meta') ctrlPressedAt = Date.now();
+}, true);
+document.addEventListener('keyup', (e) => {
+  if (e.key === 'Control' || e.key === 'Meta') ctrlPressedAt = 0;
+}, true);
+
+// Listen for messages from background and popup
 browser.runtime.onMessage.addListener((message: unknown) => {
-  const msg = message as ContentMessage;
+  const msg = message as ContentMessage | { type: 'GET_MODIFIER_STATE' };
   if (msg.type === 'UPDATE_BAR') {
-    updateBar(msg.data);
+    updateBar((msg as ContentMessage).data);
+  }
+  if (msg.type === 'GET_MODIFIER_STATE') {
+    return Promise.resolve({ ctrlKey: ctrlPressedAt > 0 && (Date.now() - ctrlPressedAt) < 5000 });
   }
 });
 
